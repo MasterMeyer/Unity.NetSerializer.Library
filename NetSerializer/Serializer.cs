@@ -264,7 +264,7 @@ namespace NetSerializer
 		[Conditional("DEBUG")]
 		void AssertLocked()
 		{
-			Debug.Assert(System.Threading.Monitor.IsEntered(m_modifyLock));
+			//Debug.Assert(System.Threading.Monitor.IsEntered(m_modifyLock));
 		}
 
 		public void Serialize(Stream stream, object ob)

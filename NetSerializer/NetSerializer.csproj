@@ -66,6 +66,12 @@
   <ItemGroup>
     <None Include="NetSerializer.snk" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\lib\System.Core.Net35\Core\System.Core.Net35.csproj">
+      <Project>{b5078871-4299-49ed-b921-3b5ebe57336a}</Project>
+      <Name>System.Core.Net35</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

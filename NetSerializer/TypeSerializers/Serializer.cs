@@ -15,6 +15,8 @@ namespace NetSerializer
 {
 	public class Serializer
 	{
+		private long internalTypeCycles = 0;
+
 		readonly static IStaticTypeSerializer[] s_typeSerializers = new IStaticTypeSerializer[] {
 			new StringSerializer(),
 			new BoolSerializer(),
@@ -101,6 +103,7 @@ namespace NetSerializer
 
 			while (stack.Count > 0)
 			{
+				internalTypeCycles++;
 				var type = stack.Pop();
 
 				if (m_runtimeTypeMap.ContainsKey(type))
@@ -124,6 +127,7 @@ namespace NetSerializer
 
 				foreach (var t in serializer.GetSubtypes(type))
 				{
+					internalTypeCycles++;
 					if (m_runtimeTypeMap.ContainsKey(t) == false)
 						stack.Push(t);
 				}
@@ -136,6 +140,7 @@ namespace NetSerializer
 		{
 			foreach (var kvp in typeMap)
 			{
+				internalTypeCycles++;
 				var type = kvp.Key;
 				uint typeID = kvp.Value;
 
@@ -208,8 +213,12 @@ namespace NetSerializer
 						writer.Write(item.Key);
 						writer.Write(item.Value.FullName);
 					}
+					// append number of cycles of internal parsing to get see when a parameter of a type is missing
+					writer.Write(internalTypeCycles);
 				}
-
+				writer.Flush();
+				stream.Flush();
+				stream.Position = 0;
 				var sha256 = System.Security.Cryptography.SHA256.Create();
 				var bytes = sha256.ComputeHash(stream);
 
@@ -239,7 +248,7 @@ namespace NetSerializer
 
 		public void Serialize(Stream stream, object value, Type type)
 		{
-			var serializer = m_runtimeTypeMap[type].TypeSerializer;
+			IStaticTypeSerializer serializer = GetTypeSerializer(type);
 
 			serializer.Serialize(this, type, stream, value);
 		}
@@ -251,7 +260,7 @@ namespace NetSerializer
 
 		public object Deserialize(Stream stream, Type type)
 		{
-			var serializer = m_runtimeTypeMap[type].TypeSerializer;
+			IStaticTypeSerializer serializer = GetTypeSerializer(type);
 
 			return serializer.Deserialize(this, type, stream);
 		}

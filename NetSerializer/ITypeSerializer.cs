@@ -8,12 +8,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
+using System.IO;
 
 namespace NetSerializer
 {
-	public interface ITypeSerializer
+	public interface IStaticTypeSerializer
 	{
 		/// <summary>
 		/// Returns if this TypeSerializer handles the given type
@@ -24,31 +23,9 @@ namespace NetSerializer
 		/// Return types that are needed to serialize the given type
 		/// </summary>
 		IEnumerable<Type> GetSubtypes(Type type);
-	}
 
-	public interface IStaticTypeSerializer : ITypeSerializer
-	{
-		/// <summary>
-		/// Get static method used to serialize the given type
-		/// </summary>
-		MethodInfo GetStaticWriter(Type type);
+		void Serialize(Serializer serializer, Type staticType, Stream stream, object ob);
 
-		/// <summary>
-		/// Get static method used to deserialize the given type
-		/// </summary>
-		MethodInfo GetStaticReader(Type type);
-	}
-
-	public interface IDynamicTypeSerializer : ITypeSerializer
-	{
-		/// <summary>
-		/// Generate code to serialize the given type
-		/// </summary>
-		void GenerateWriterMethod(Serializer serializer, Type type, ILGenerator il);
-
-		/// <summary>
-		/// Generate code to deserialize the given type
-		/// </summary>
-		void GenerateReaderMethod(Serializer serializer, Type type, ILGenerator il);
+		object Deserialize(Serializer serializer, Type staticType, Stream stream);
 	}
 }

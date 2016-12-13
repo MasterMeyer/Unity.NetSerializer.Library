@@ -8,11 +8,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Text;
 
 namespace NetSerializer
 {
@@ -30,22 +26,18 @@ namespace NetSerializer
 			return new[] { underlyingType };
 		}
 
-		public MethodInfo GetStaticWriter(Type type)
+		public void Serialize(Serializer serializer, Type staticType, Stream stream, object ob)
 		{
-			Debug.Assert(type.IsEnum);
-
-			var underlyingType = Enum.GetUnderlyingType(type);
-
-			return Primitives.GetWritePrimitive(underlyingType);
+			var underlyingType = Enum.GetUnderlyingType(staticType);
+			IStaticTypeSerializer primitiveSerializer = serializer.GetTypeData(underlyingType).TypeSerializer;
+			primitiveSerializer.Serialize(serializer, underlyingType, stream, ob);
 		}
 
-		public MethodInfo GetStaticReader(Type type)
+		public object Deserialize(Serializer serializer, Type staticType, Stream stream)
 		{
-			Debug.Assert(type.IsEnum);
-
-			var underlyingType = Enum.GetUnderlyingType(type);
-
-			return Primitives.GetReaderPrimitive(underlyingType);
+			var underlyingType = Enum.GetUnderlyingType(staticType);
+			IStaticTypeSerializer primitiveSerializer = serializer.GetTypeData(underlyingType).TypeSerializer;
+			return primitiveSerializer.Deserialize(serializer, underlyingType, stream);
 		}
 	}
 }

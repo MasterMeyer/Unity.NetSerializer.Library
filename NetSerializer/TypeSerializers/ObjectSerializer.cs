@@ -9,34 +9,30 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 
 namespace NetSerializer
 {
 	sealed class ObjectSerializer : IStaticTypeSerializer
 	{
+		private Dictionary<Type, ConstructorInfo> constructorCache = new Dictionary<Type, ConstructorInfo>();
+		public static Type OBJECT_TYPE = typeof(object);
+
 		public bool Handles(Type type)
 		{
-			return type == typeof(object);
+			return OBJECT_TYPE.IsAssignableFrom(type);
 		}
 
 		public IEnumerable<Type> GetSubtypes(Type type)
 		{
-			return new Type[0];
+			var fields = Helpers.GetFieldInfos(type);
+
+			foreach (var field in fields)
+				yield return field.FieldType;
 		}
 
-		public MethodInfo GetStaticWriter(Type type)
-		{
-			return typeof(ObjectSerializer).GetMethod("Serialize", BindingFlags.Static | BindingFlags.Public);
-		}
 
-		public MethodInfo GetStaticReader(Type type)
-		{
-			return typeof(ObjectSerializer).GetMethod("Deserialize", BindingFlags.Static | BindingFlags.Public);
-		}
-
-		public static void Serialize(Serializer serializer, Stream stream, object ob)
+		public void Serialize(Serializer serializer, Type staticType, Stream stream, object ob)
 		{
 			if (ob == null)
 			{
@@ -46,19 +42,27 @@ namespace NetSerializer
 
 			var type = ob.GetType();
 
-			SerializeDelegate<object> del;
+			TypeData typeData = serializer.GetTypeData(type);
 
-			uint id = serializer.GetTypeIdAndSerializer(type, out del);
+			var id = typeData.TypeID;
 
 			Primitives.WritePrimitive(stream, id);
 
 			if (id == Serializer.ObjectTypeId)
 				return;
 
-			del(serializer, stream, ob);
+			var fields = Helpers.GetFieldInfos(type);
+
+			foreach (FieldInfo fieldInfo in fields)
+			{
+				object value = fieldInfo.GetValue(ob);
+				Type fieldType = fieldInfo.FieldType;
+				TypeData subTypeData = serializer.GetTypeData(fieldType);
+				subTypeData.TypeSerializer.Serialize(serializer, fieldType, stream, value);
+			}
 		}
 
-		public static void Deserialize(Serializer serializer, Stream stream, out object ob)
+		public object Deserialize(Serializer serializer, Type staticType, Stream stream)
 		{
 			uint id;
 
@@ -66,18 +70,35 @@ namespace NetSerializer
 
 			if (id == 0)
 			{
-				ob = null;
-				return;
+				return null;
 			}
-
 			if (id == Serializer.ObjectTypeId)
 			{
-				ob = new object();
-				return;
+				return new object();
 			}
 
-			var del = serializer.GetDeserializeTrampolineFromId(id);
-			del(serializer, stream, out ob);
+			TypeData typeData = serializer.GetTypeDataById(id);
+			Type type = typeData.Type;
+			object result = GetConstructorForType(type).Invoke(new object[0]);
+			var fields = Helpers.GetFieldInfos(type);
+			foreach (FieldInfo fieldInfo in fields)
+			{
+				Type fieldType = fieldInfo.FieldType;
+				TypeData subTypeData = serializer.GetTypeData(fieldType);
+				object value = subTypeData.TypeSerializer.Deserialize(serializer, fieldType, stream);
+				fieldInfo.SetValue(result, value);
+			}
+			return result;
+		}
+
+		private ConstructorInfo GetConstructorForType(Type type)
+		{
+			if (!constructorCache.ContainsKey(type))
+			{
+				ConstructorInfo objectConstructor = type.GetConstructor(new Type[0]);
+				constructorCache[type] = objectConstructor;
+			}
+			return constructorCache[type];
 		}
 	}
 }

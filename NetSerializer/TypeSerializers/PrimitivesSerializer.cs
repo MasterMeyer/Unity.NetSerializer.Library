@@ -11,21 +11,17 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 
 namespace NetSerializer
 {
 	sealed class PrimitivesSerializer : IStaticTypeSerializer
 	{
 		static Type[] s_primitives = new Type[] {
-				typeof(bool),
 				typeof(byte), typeof(sbyte),
 				typeof(char),
 				typeof(ushort), typeof(short),
-				typeof(uint), typeof(int),
-				typeof(ulong), typeof(long),
-				typeof(float), typeof(double),
-				typeof(string),
+				typeof(ulong),
+				typeof(float),
 				typeof(DateTime),
 				typeof(byte[]),
 				typeof(Decimal),
@@ -41,15 +37,21 @@ namespace NetSerializer
 			return new Type[0];
 		}
 
-		public MethodInfo GetStaticWriter(Type type)
+		public void Serialize(Serializer serializer, Type staticType, Stream stream, object ob)
 		{
-			return Primitives.GetWritePrimitive(type);
+			MethodInfo method = Primitives.GetWritePrimitive(staticType);
+			method.Invoke(null , new object[] {stream, ob});
 		}
 
-		public MethodInfo GetStaticReader(Type type)
+		public object Deserialize(Serializer serializer, Type staticType, Stream stream)
 		{
-			return Primitives.GetReaderPrimitive(type);
+			MethodInfo method = Primitives.GetReaderPrimitive(staticType);
+			object[] parameters = new object[] {stream, null};
+			method.Invoke(null , parameters);
+			// return out parameter
+			return parameters[1];
 		}
+
 
 		public static IEnumerable<Type> GetSupportedTypes()
 		{

@@ -14,7 +14,7 @@ using System.Reflection;
 
 namespace NetSerializer
 {
-	sealed class DictionarySerializer : IStaticTypeSerializer
+	sealed class GenericListSerializer : IStaticTypeSerializer
 	{
 		private Dictionary<Type, ConstructorInfo> constructorCache = new Dictionary<Type, ConstructorInfo>();
 
@@ -23,15 +23,11 @@ namespace NetSerializer
 			if (!type.IsGenericType)
 				return false;
 
-			var genTypeDef = type.GetGenericTypeDefinition();
-
-			return genTypeDef == typeof(Dictionary<,>);
+			return typeof(IList).IsAssignableFrom(type);
 		}
 
 		public IEnumerable<Type> GetSubtypes(Type type)
 		{
-			// Dictionary<K,V> is stored as [Key, Value]+
-
 			var genArgs = type.GetGenericArguments();
 
 			return genArgs;
@@ -45,20 +41,17 @@ namespace NetSerializer
 			}
 			else
 			{
-				IDictionary valueDict = (IDictionary) ob;
-				int length = valueDict.Count;
+				IList value = (IList) ob;
+				int length = value.Count;
 				Primitives.WritePrimitive(stream, (uint) length + 1);
 
 				Type[] genericArguments = staticType.GetGenericArguments();
-				Type keyType = genericArguments[0];
-				Type valueType = genericArguments[1];
-				TypeData keyTypeData = serializer.GetTypeData(keyType);
-				TypeData valueTypeData = serializer.GetTypeData(valueType);
+				Type elementType = genericArguments[0];
+				TypeData elementTypeData = serializer.GetTypeData(elementType);
 
-				foreach  (DictionaryEntry entry in valueDict)
+				foreach  (object element in value)
 				{
-					keyTypeData.TypeSerializer.Serialize(serializer, keyType, stream, entry.Key);
-					valueTypeData.TypeSerializer.Serialize(serializer, valueType, stream, entry.Value);
+					elementTypeData.TypeSerializer.Serialize(serializer, elementType, stream, element);
 				}
 			}
 		}
@@ -75,17 +68,14 @@ namespace NetSerializer
 			{
 				int length = (int) lengthField - 1;
 				Type[] genericArguments = staticType.GetGenericArguments();
-				Type keyType = genericArguments[0];
-				Type valueType = genericArguments[1];
-				TypeData keyTypeData = serializer.GetTypeData(keyType);
-				TypeData valueTypeData = serializer.GetTypeData(valueType);
-				ConstructorInfo dictionaryConstructor = GetConstructorForType(staticType);
-				IDictionary result = (IDictionary) dictionaryConstructor.Invoke(new object[] {length});
+				Type elementType = genericArguments[0];
+				TypeData elementTypeData = serializer.GetTypeData(elementType);
+				ConstructorInfo listConstructor = GetConstructorForType(staticType);
+				IList result = (IList) listConstructor.Invoke(new object[] {length});
 				for (int i = 0; i < length; i++)
 				{
-					object key = keyTypeData.TypeSerializer.Deserialize(serializer, keyType, stream);
-					object value = valueTypeData.TypeSerializer.Deserialize(serializer, valueType, stream);
-					result.Add(key, value);
+					object element = elementTypeData.TypeSerializer.Deserialize(serializer, elementType, stream);
+					result.Add(element);
 				}
 				return result;
 			}
@@ -96,9 +86,8 @@ namespace NetSerializer
 			if (!constructorCache.ContainsKey(staticType))
 			{
 				Type[] genericArguments = staticType.GetGenericArguments();
-				ConstructorInfo dictionaryConstructor =
-					typeof(Dictionary<,>).MakeGenericType(genericArguments).GetConstructor(new Type[] {typeof(int)});
-				constructorCache[staticType] = dictionaryConstructor;
+				ConstructorInfo listConstructor = typeof(List<>).MakeGenericType(genericArguments).GetConstructor(new Type[]{typeof(int)});
+				constructorCache[staticType] = listConstructor;
 			}
 			return constructorCache[staticType];
 		}
